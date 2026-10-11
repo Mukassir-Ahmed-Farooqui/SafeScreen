@@ -1,43 +1,17 @@
 package com.example.safescreen.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
-
-private val DarkColors = darkColorScheme(
-    primary = Mint,
-    onPrimary = Ink,
-    background = Ink,
-    onBackground = TextHigh,
-    surface = Slate,
-    onSurface = TextHigh,
-    surfaceVariant = SlateHigh,
-    onSurfaceVariant = TextMuted,
-    error = Danger
-)
-
-private val LightColors = lightColorScheme(
-    primary = MintDark,
-    onPrimary = Cloud,
-    background = Cloud,
-    onBackground = Ink,
-    surface = Color.White,
-    onSurface = Ink,
-    surfaceVariant = Color(0xFFE8EEF7),
-    onSurfaceVariant = Color(0xFF5B6B84),
-    error = Danger
-)
+import androidx.compose.runtime.remember
 
 @Composable
 fun SafeScreenTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    palette: PtyxisPalette = PtyxisPalette.COBALT_NEON,
     content: @Composable () -> Unit
 ) {
+    val colorScheme = remember(palette) { buildPtyxisColorScheme(palette) }
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = colorScheme,
         typography = Typography,
         content = content
     )
