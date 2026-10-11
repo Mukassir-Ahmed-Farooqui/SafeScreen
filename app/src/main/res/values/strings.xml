@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">SafeScreen</string>
+    <string name="accessibility_service_description">SafeScreen uses this service only to notice which app is open, so it can apply the rules a parent set. It cannot read what is on screen or what is typed.</string>
 </resources>

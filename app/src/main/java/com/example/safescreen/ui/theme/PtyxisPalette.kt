@@ -6,7 +6,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 
+/**
+ * Terminal palettes ported from GNOME Ptyxis (via Airgap). Each entry has the
+ * palette's exact background and foreground plus three accents and an error
+ * colour. All are dark schemes; every other Material role is derived by
+ * lerping, so each theme keeps its own hue.
+ */
 enum class PtyxisPalette(
+    val key: String,
     val displayName: String,
     val background: Long,
     val foreground: Long,
@@ -15,9 +22,15 @@ enum class PtyxisPalette(
     val tertiaryC: Long,
     val errorC: Long,
 ) {
-    COBALT_NEON("Cobalt Neon", 0xFF142838, 0xFF8FF586, 0xFF8FF586, 0xFF3BA5FF, 0xFFE9E75C, 0xFFFF2320),
-    NORD("Nord", 0xFF2E3440, 0xFFD8DEE9, 0xFF88C0D0, 0xFF81A1C1, 0xFF8FBCBB, 0xFFBF616A),
-    SYNTHWAVE("Synthwave", 0xFF262335, 0xFFFFFFFF, 0xFFFF7EDB, 0xFF03EDF9, 0xFFFEDE5D, 0xFFFE4450),
+    COBALT_NEON("cobalt_neon", "Cobalt Neon", 0xFF142838, 0xFF8FF586, 0xFF8FF586, 0xFF3BA5FF, 0xFFE9E75C, 0xFFFF2320),
+    NORD("nord", "Nord", 0xFF2E3440, 0xFFD8DEE9, 0xFF88C0D0, 0xFF81A1C1, 0xFF8FBCBB, 0xFFBF616A),
+    SYNTHWAVE("synthwave", "Synthwave", 0xFF262335, 0xFFFFFFFF, 0xFFFF7EDB, 0xFF03EDF9, 0xFFFEDE5D, 0xFFFE4450),
+    FAIRY_FLOSS("fairy_floss", "Fairy Floss", 0xFF5A5475, 0xFFC2FFDF, 0xFFFFB8D1, 0xFFAE81FF, 0xFFC2FFDF, 0xFFFF857F);
+
+    companion object {
+        fun fromKey(key: String?): PtyxisPalette =
+            entries.firstOrNull { it.key == key } ?: COBALT_NEON
+    }
 }
 
 fun buildPtyxisColorScheme(palette: PtyxisPalette): ColorScheme {

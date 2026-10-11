@@ -7,12 +7,12 @@ import androidx.compose.runtime.remember
 @Composable
 fun SafeScreenTheme(
     palette: PtyxisPalette = PtyxisPalette.COBALT_NEON,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val colorScheme = remember(palette) { buildPtyxisColorScheme(palette) }
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        content = content
+        content = content,
     )
 }

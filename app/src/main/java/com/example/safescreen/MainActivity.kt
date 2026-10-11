@@ -4,42 +4,35 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.safescreen.ui.DashboardScreen
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.safescreen.ui.SafeScreenRoot
+import com.example.safescreen.ui.theme.PtyxisPalette
 import com.example.safescreen.ui.theme.SafeScreenTheme
 
 class MainActivity : ComponentActivity() {
+
+    private val container get() = (application as SafeScreenApp).container
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            SafeScreenTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    DashboardScreen(modifier = Modifier.padding(innerPadding))
-                }
+            val palette by container.settingsRepository.palette
+                .collectAsStateWithLifecycle(initialValue = PtyxisPalette.COBALT_NEON)
+            SafeScreenTheme(palette = palette) {
+                SafeScreenRoot()
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+    override fun onStart() {
+        super.onStart()
+        container.sessionManager.onAppForegrounded()
+    }
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    SafeScreenTheme {
-        Greeting("Android")
+    override fun onStop() {
+        super.onStop()
+        container.sessionManager.onAppBackgrounded()
     }
 }
