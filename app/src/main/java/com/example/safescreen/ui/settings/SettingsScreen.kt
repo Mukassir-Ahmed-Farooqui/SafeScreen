@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -63,6 +64,7 @@ fun SettingsScreen(
 ) {
     val palette by viewModel.palette.collectAsStateWithLifecycle()
     val permissions by viewModel.permissions.collectAsStateWithLifecycle()
+    val notificationsEnabled by viewModel.notificationsEnabled.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showChangePin by remember { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshPermissions() }
@@ -102,6 +104,33 @@ fun SettingsScreen(
                     actionLabel = "Open settings",
                     onAction = { PermissionChecker.openAccessibilitySettings(context) },
                 )
+                PermissionRow(
+                    title = "Notifications",
+                    body = "Lets SafeScreen send the alerts below.",
+                    granted = permissions.notifications,
+                    actionLabel = "Open settings",
+                    onAction = { PermissionChecker.openNotificationSettings(context) },
+                )
+            }
+        }
+
+        SectionTitle("Notifications")
+        SoftCard {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Activity alerts", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                        Text(
+                            "Tell me when an app is blocked or has 5 minutes left. A warning when blocking is switched off is always sent.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = notificationsEnabled, onCheckedChange = viewModel::setNotificationsEnabled)
+                }
+                OutlinedButton(onClick = viewModel::sendTestNotification, modifier = Modifier.fillMaxWidth()) {
+                    Text("Send a test notification")
+                }
             }
         }
 

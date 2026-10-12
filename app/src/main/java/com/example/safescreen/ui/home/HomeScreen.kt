@@ -25,6 +25,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +53,7 @@ import com.example.safescreen.ui.components.WarningColor
 import com.example.safescreen.ui.components.formatDuration
 import com.example.safescreen.ui.components.formatLimit
 import com.example.safescreen.ui.containerFactory
+import com.example.safescreen.ui.setup.PermissionSetupDialog
 
 @Composable
 fun HomeScreen(
@@ -60,6 +64,16 @@ fun HomeScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
+
+    // Guided pop-up: shown until everything is allowed or the parent taps "Later".
+    var showSetupDialog by rememberSaveable { mutableStateOf(true) }
+    if (!state.loading && !state.allPermissionsGranted && showSetupDialog) {
+        PermissionSetupDialog(
+            permissions = state.permissions,
+            onChanged = viewModel::refresh,
+            onDismiss = { showSetupDialog = false },
+        )
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),

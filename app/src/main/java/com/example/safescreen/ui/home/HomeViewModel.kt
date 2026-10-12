@@ -31,6 +31,7 @@ data class HomeUiState(
 ) {
     val restrictedCount: Int get() = rules.count { it.decision.isRestricted }
     val setupComplete: Boolean get() = permissions.usageAccess && permissions.accessibility
+    val allPermissionsGranted: Boolean get() = setupComplete && permissions.notifications
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

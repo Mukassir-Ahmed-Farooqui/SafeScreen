@@ -29,6 +29,17 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch { container.settingsRepository.setPalette(palette) }
     }
 
+    val notificationsEnabled: StateFlow<Boolean> = container.settingsRepository.notificationsEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    fun setNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch { container.settingsRepository.setNotificationsEnabled(enabled) }
+    }
+
+    fun sendTestNotification() {
+        container.notifier.sendTest()
+    }
+
     fun lockNow() = container.sessionManager.lock()
 
     suspend fun changePin(current: String, new: String): PinResult =

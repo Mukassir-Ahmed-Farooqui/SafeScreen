@@ -54,6 +54,16 @@ class BlockedActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        isVisible = true
+    }
+
+    override fun onStop() {
+        isVisible = false
+        super.onStop()
+    }
+
     private fun goHome() {
         startActivity(
             Intent(Intent.ACTION_MAIN)
@@ -64,6 +74,11 @@ class BlockedActivity : ComponentActivity() {
     }
 
     companion object {
+        /** True while the block screen is on screen; the service uses it to detect a refused launch. */
+        @Volatile
+        var isVisible: Boolean = false
+            private set
+
         private const val EXTRA_APP_NAME = "app_name"
         private const val EXTRA_VERDICT = "verdict"
         private const val EXTRA_USED_MS = "used_ms"
