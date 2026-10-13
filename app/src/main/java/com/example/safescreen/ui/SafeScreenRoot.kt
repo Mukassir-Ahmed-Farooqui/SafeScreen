@@ -14,6 +14,7 @@ import com.example.safescreen.SafeScreenApp
 import com.example.safescreen.ui.pin.PinMode
 import com.example.safescreen.ui.pin.PinScreen
 import com.example.safescreen.ui.pin.PinViewModel
+import com.example.safescreen.ui.pin.RecoveryCodeDialog
 
 private enum class Gate { LOADING, SETUP, LOCKED, UNLOCKED }
 
@@ -23,6 +24,7 @@ fun SafeScreenRoot() {
     val container = (LocalContext.current.applicationContext as SafeScreenApp).container
     val hasPin by container.pinManager.hasPin.collectAsStateWithLifecycle(initialValue = null)
     val unlocked by container.sessionManager.unlocked.collectAsStateWithLifecycle()
+    val pendingRecoveryCode by container.sessionManager.pendingRecoveryCode.collectAsStateWithLifecycle()
     val pinViewModel: PinViewModel = viewModel(factory = containerFactory { PinViewModel(it) })
 
     val gate = when {
@@ -41,5 +43,10 @@ fun SafeScreenRoot() {
                 Gate.UNLOCKED -> MainScaffold()
             }
         }
+    }
+
+    val recoveryCode = pendingRecoveryCode
+    if (recoveryCode != null && gate == Gate.UNLOCKED) {
+        RecoveryCodeDialog(code = recoveryCode, onSaved = container.sessionManager::clearRecoveryCode)
     }
 }

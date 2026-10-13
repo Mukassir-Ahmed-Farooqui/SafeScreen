@@ -72,6 +72,7 @@ class PinViewModel(container: AppContainer) : ViewModel() {
                 firstEntry = null
                 session.unlock() // safe: the setup screen is shown until the PIN exists
                 pinManager.createPin(pin)
+                session.showRecoveryCode(pinManager.createRecoveryCode())
                 _state.value = PinUiState()
             }
             else -> {
@@ -85,12 +86,28 @@ class PinViewModel(container: AppContainer) : ViewModel() {
         when (val result = pinManager.verify(pin)) {
             PinResult.Success -> {
                 session.unlock()
+                // Installs created before recovery codes existed get one on their next unlock.
+                if (!pinManager.hasRecoveryCodeNow()) session.showRecoveryCode(pinManager.createRecoveryCode())
                 _state.value = PinUiState()
             }
             is PinResult.Wrong -> fail("Wrong PIN. ${result.attemptsLeft} attempts left.")
             is PinResult.LockedOut -> startLockout(result.remainingMs)
             PinResult.NotSet -> fail("No PIN is set yet.")
         }
+    }
+
+    /**
+     * "Forgot PIN": a correct recovery code sets the new PIN and unlocks. The
+     * code is single-use, so a fresh one is issued right away.
+     */
+    suspend fun resetWithRecoveryCode(code: String, newPin: String): PinResult {
+        val result = pinManager.resetPinWithRecoveryCode(code, newPin)
+        if (result is PinResult.Success) {
+            session.unlock()
+            session.showRecoveryCode(pinManager.createRecoveryCode())
+            _state.value = PinUiState()
+        }
+        return result
     }
 
     private fun fail(message: String) {

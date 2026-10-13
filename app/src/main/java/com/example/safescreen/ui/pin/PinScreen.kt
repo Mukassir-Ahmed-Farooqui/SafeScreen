@@ -19,10 +19,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +45,7 @@ fun PinScreen(mode: PinMode, viewModel: PinViewModel, modifier: Modifier = Modif
     val state by viewModel.state.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
     val shake = remember { Animatable(0f) }
+    var showForgot by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.errorTick) {
         if (state.errorTick > 0) {
@@ -98,6 +102,18 @@ fun PinScreen(mode: PinMode, viewModel: PinViewModel, modifier: Modifier = Modif
             enabled = !state.busy && state.lockedSeconds == 0,
             onDigit = { viewModel.onDigit(mode, it) },
             onDelete = viewModel::onDelete,
+        )
+
+        if (mode == PinMode.UNLOCK) {
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = { showForgot = true }) { Text("Forgot PIN?") }
+        }
+    }
+
+    if (showForgot) {
+        ForgotPinDialog(
+            onDismiss = { showForgot = false },
+            onSubmit = { code, newPin -> viewModel.resetWithRecoveryCode(code, newPin) },
         )
     }
 }

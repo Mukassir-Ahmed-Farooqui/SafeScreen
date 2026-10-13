@@ -17,10 +17,18 @@ class SessionManager(
     private val _unlocked = MutableStateFlow(false)
     val unlocked: StateFlow<Boolean> = _unlocked.asStateFlow()
 
+    private val _pendingRecoveryCode = MutableStateFlow<String?>(null)
+
+    /** A freshly generated recovery code waiting to be shown (once) and acknowledged. Memory only. */
+    val pendingRecoveryCode: StateFlow<String?> = _pendingRecoveryCode.asStateFlow()
+
     private var backgroundedAt: Long? = null
 
     fun unlock() { _unlocked.value = true }
     fun lock() { _unlocked.value = false }
+
+    fun showRecoveryCode(code: String) { _pendingRecoveryCode.value = code }
+    fun clearRecoveryCode() { _pendingRecoveryCode.value = null }
 
     fun onAppBackgrounded() {
         backgroundedAt = elapsedRealtime()
