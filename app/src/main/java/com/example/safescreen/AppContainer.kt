@@ -14,6 +14,7 @@ import com.example.safescreen.security.SessionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -29,7 +30,7 @@ class AppContainer(context: Context) {
     val settingsRepository = SettingsRepository(appContext.safeScreenDataStore)
     val pinManager = PinManager(appContext.safeScreenDataStore)
     val sessionManager = SessionManager()
-    val usageMonitor = UsageMonitor(appContext)
+    val usageMonitor = UsageMonitor(appContext) { settingsRepository.usageBaselineMillis.first() }
     val installedApps = InstalledAppsProvider(appContext)
     val permissions = PermissionChecker(appContext)
     val notifier = Notifier(appContext)

@@ -9,14 +9,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Computes today's foreground time per package from raw usage *events*
- * (resume/pause pairs). Events are far more accurate than the pre-aggregated
- * buckets from queryUsageStats, which can overlap day boundaries.
+ * Reads raw usage events and hands them to [UsageSessions] to compute today's
+ * foreground time per package.
+ *
+ * Counting starts at local midnight, or at [baselineMillis] if the parent has
+ * pressed "Reset today's usage" since then.
  *
  * Returns an empty map when Usage Access is not granted: callers must treat
  * that as "unknown", never as "zero usage".
  */
-class UsageMonitor(context: Context) {
+class UsageMonitor(
+    context: Context,
+    private val baselineMillis: suspend () -> Long = { 0L },
+) {
     private val usageStatsManager =
         context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
 
@@ -24,35 +29,22 @@ class UsageMonitor(context: Context) {
         val zone = ZoneId.systemDefault()
         val now = System.currentTimeMillis()
         val startOfDay = LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
+        val start = maxOf(startOfDay, baselineMillis())
         try {
-            foregroundTotals(startOfDay, now)
+            UsageSessions.totals(readEvents(start, now), now)
         } catch (_: SecurityException) {
             emptyMap()
         }
     }
 
-    @Suppress("DEPRECATION") // MOVE_TO_* are the only constants available below API 29.
-    private fun foregroundTotals(start: Long, end: Long): Map<String, Long> {
+    private fun readEvents(start: Long, end: Long): List<RawUsageEvent> {
         val events = usageStatsManager.queryEvents(start, end)
         val event = UsageEvents.Event()
-        val openSince = HashMap<String, Long>()
-        val totals = HashMap<String, Long>()
-
+        val list = ArrayList<RawUsageEvent>()
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
-            val pkg = event.packageName ?: continue
-            when (event.eventType) {
-                UsageEvents.Event.MOVE_TO_FOREGROUND -> openSince.putIfAbsent(pkg, event.timeStamp)
-                UsageEvents.Event.MOVE_TO_BACKGROUND -> {
-                    val since = openSince.remove(pkg) ?: continue
-                    totals.merge(pkg, (event.timeStamp - since).coerceAtLeast(0L), Long::plus)
-                }
-            }
+            list += RawUsageEvent(event.eventType, event.packageName, event.timeStamp)
         }
-        // Apps still in the foreground right now count up to this moment.
-        openSince.forEach { (pkg, since) ->
-            totals.merge(pkg, (end - since).coerceAtLeast(0L), Long::plus)
-        }
-        return totals
+        return list
     }
 }

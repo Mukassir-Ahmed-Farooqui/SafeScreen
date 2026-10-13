@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.example.safescreen.ui.theme.PtyxisPalette
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +19,14 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     val notificationsEnabled: Flow<Boolean> =
         dataStore.data.map { it[NOTIFICATIONS_KEY] ?: true }
 
+    /** Time of the last "Reset today's usage"; usage is counted from the later of this and midnight. */
+    val usageBaselineMillis: Flow<Long> =
+        dataStore.data.map { it[USAGE_BASELINE_KEY] ?: 0L }
+
+    suspend fun resetUsageBaseline(now: Long = System.currentTimeMillis()) {
+        dataStore.edit { it[USAGE_BASELINE_KEY] = now }
+    }
+
     suspend fun setPalette(palette: PtyxisPalette) {
         dataStore.edit { it[PALETTE_KEY] = palette.key }
     }
@@ -29,5 +38,6 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     private companion object {
         val PALETTE_KEY = stringPreferencesKey("palette")
         val NOTIFICATIONS_KEY = booleanPreferencesKey("notifications_enabled")
+        val USAGE_BASELINE_KEY = longPreferencesKey("usage_baseline_millis")
     }
 }
