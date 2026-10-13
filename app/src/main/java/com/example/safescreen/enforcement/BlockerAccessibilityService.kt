@@ -5,11 +5,13 @@ import android.content.Context
 import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
 import com.example.safescreen.SafeScreenApp
 import com.example.safescreen.data.AppRule
 import com.example.safescreen.data.hasLimit
 import com.example.safescreen.domain.RestrictionDecision
 import com.example.safescreen.domain.RestrictionPolicy
+import com.example.safescreen.domain.UsageWarnings
 import java.time.LocalDate
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
@@ -29,12 +31,10 @@ import kotlinx.coroutines.withContext
  * Privacy: the service config sets canRetrieveWindowContent=false, so it can
  * see *which* app is open but never what is on screen or what is typed.
  *
- * Extras over the basic version:
- *  - limits are re-checked every [RECHECK_MS] while a limited app stays open;
- *  - if Android refuses to start the block screen from the background, the app
- *    is pushed to the Home screen instead (checked [FALLBACK_CHECK_MS] later);
- *  - a notification fires when blocking is blocked/limit is nearly used up,
- *    and when this service itself is switched off.
+ * Timing: while a limited app stays open it is re-checked every 15s, and every
+ * 5s during the last 90s, so the block lands within seconds of the limit.
+ * Warnings (10 / 5 / 1 minutes left) are a notification plus a toast, once each
+ * per app per day.
  */
 class BlockerAccessibilityService : AccessibilityService() {
 
@@ -45,7 +45,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     private var ignoredPackages: Set<String> = setOf("com.android.systemui")
     private var watchJob: Job? = null
     private var lastBlock: Pair<String, Long>? = null
-    private val warnedToday = ConcurrentHashMap<String, LocalDate>()
+    private val announced = ConcurrentHashMap<String, Pair<LocalDate, Set<Int>>>()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -73,15 +73,15 @@ class BlockerAccessibilityService : AccessibilityService() {
 
         watchJob = scope.launch {
             while (isActive) {
-                if (enforce(pkg)) break
-                delay(RECHECK_MS)
+                val wait = enforce(pkg) ?: break
+                delay(wait)
             }
         }
     }
 
-    /** Returns true when watching this app can stop (it was blocked, or its rule is gone). */
-    private suspend fun enforce(pkg: String): Boolean {
-        val rule = rules[pkg] ?: return true
+    /** Returns how long to wait before checking again, or null when watching this app can stop. */
+    private suspend fun enforce(pkg: String): Long? {
+        val rule = rules[pkg] ?: return null
         val usedMillis = if (rule.hasLimit && !rule.isBlocked && container.permissions.hasUsageAccess()) {
             container.usageMonitor.todayUsageMillis()[pkg] ?: 0L
         } else {
@@ -89,8 +89,8 @@ class BlockerAccessibilityService : AccessibilityService() {
         }
         val decision = RestrictionPolicy.evaluate(rule, usedMillis)
         if (!decision.isRestricted) {
-            warnIfAlmostOut(rule, decision)
-            return false
+            warnIfNeeded(rule, decision)
+            return nextCheckDelay(decision.remainingMillis)
         }
         withContext(Dispatchers.Main) {
             showBlockScreen(rule, decision)
@@ -98,15 +98,31 @@ class BlockerAccessibilityService : AccessibilityService() {
             delay(FALLBACK_CHECK_MS)
             if (!BlockedActivity.isVisible) performGlobalAction(GLOBAL_ACTION_HOME)
         }
-        return true
+        return null
     }
 
-    private fun warnIfAlmostOut(rule: AppRule, decision: RestrictionDecision) {
+    private fun nextCheckDelay(remainingMillis: Long?): Long = when {
+        remainingMillis == null -> RECHECK_MS
+        remainingMillis <= FINAL_STRETCH_MS -> minOf(FINAL_RECHECK_MS, remainingMillis).coerceAtLeast(1_000L)
+        else -> RECHECK_MS
+    }
+
+    private suspend fun warnIfNeeded(rule: AppRule, decision: RestrictionDecision) {
         val remaining = decision.remainingMillis ?: return
-        if (remaining <= 0L || remaining > LOW_TIME_MS) return
         val today = LocalDate.now()
-        if (warnedToday.put(rule.packageName, today) == today) return
-        container.notifier.notifyLowTime(rule.appName, rule.packageName, remaining)
+        val before = announced[rule.packageName]?.takeIf { it.first == today }?.second.orEmpty()
+        val step = UsageWarnings.next(remaining, decision.limitMinutes, before)
+        announced[rule.packageName] = today to step.announced
+        val minutes = step.threshold ?: return
+
+        container.notifier.notifyTimeLeft(rule.appName, rule.packageName, minutes)
+        withContext(Dispatchers.Main) {
+            Toast.makeText(
+                applicationContext,
+                "${rule.appName}: ${UsageWarnings.describe(minutes)} left today",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
     }
 
     private fun showBlockScreen(rule: AppRule, decision: RestrictionDecision) {
@@ -123,7 +139,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         }
     }
 
-    /** Called when the parent (or anyone) switches the service off: say so loudly. */
+    /** Called when the service is switched off (by anyone): say so loudly. */
     override fun onUnbind(intent: Intent?): Boolean {
         container.notifier.notifyProtectionOff()
         return super.onUnbind(intent)
@@ -138,8 +154,9 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     private companion object {
         const val RECHECK_MS = 15_000L
+        const val FINAL_STRETCH_MS = 90_000L
+        const val FINAL_RECHECK_MS = 5_000L
         const val DEBOUNCE_MS = 1_500L
         const val FALLBACK_CHECK_MS = 700L
-        const val LOW_TIME_MS = 5 * 60_000L
     }
 }

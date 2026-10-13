@@ -9,13 +9,13 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.safescreen.MainActivity
 import com.example.safescreen.R
+import com.example.safescreen.domain.UsageWarnings
 import com.example.safescreen.domain.Verdict
-import kotlin.math.ceil
 
 /**
  * Local notifications only. Three kinds:
  *  - blocked / limit reached (one per app, updated in place, never stacked)
- *  - five minutes left (sent once per app per day by the accessibility service)
+ *  - 10 / 5 / 1 minutes left (each sent once per app per day by the accessibility service)
  *  - protection off: fired the moment the blocking service is switched off
  *
  * [alertsEnabled] is the parent's in-app switch for the first two kinds. The
@@ -59,14 +59,15 @@ class Notifier(private val context: Context) {
         )
     }
 
-    fun notifyLowTime(appName: String, packageName: String, remainingMillis: Long) {
+    /** "10 / 5 / 1 minutes left". Alerts every time (no "only once") so each warning makes a sound. */
+    fun notifyTimeLeft(appName: String, packageName: String, minutes: Int) {
         if (!alertsEnabled) return
-        val minutes = ceil(remainingMillis / 60_000.0).toInt().coerceAtLeast(1)
         post(
             id = "low:$packageName".hashCode(),
             channel = CHANNEL_ALERTS,
-            title = "$appName: $minutes min left today",
+            title = "$appName: ${UsageWarnings.describe(minutes)} left today",
             text = "It will be blocked when the time is up.",
+            onlyAlertOnce = false,
         )
     }
 
@@ -92,7 +93,14 @@ class Notifier(private val context: Context) {
     }
 
     @SuppressLint("MissingPermission") // guarded by areNotificationsEnabled()
-    private fun post(id: Int, channel: String, title: String, text: String, autoCancel: Boolean = true) {
+    private fun post(
+        id: Int,
+        channel: String,
+        title: String,
+        text: String,
+        autoCancel: Boolean = true,
+        onlyAlertOnce: Boolean = true,
+    ) {
         if (!manager.areNotificationsEnabled()) return
         val notification = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_notification)
@@ -101,7 +109,7 @@ class Notifier(private val context: Context) {
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(openAppIntent())
             .setAutoCancel(autoCancel)
-            .setOnlyAlertOnce(true)
+            .setOnlyAlertOnce(onlyAlertOnce)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .build()
         manager.notify(id, notification)
