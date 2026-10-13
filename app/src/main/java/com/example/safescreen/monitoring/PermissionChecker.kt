@@ -98,6 +98,15 @@ class PermissionChecker(private val context: Context) {
             )
         }
 
+        /** Battery optimisation list, so the parent can exempt SafeScreen on phones that kill background apps. */
+        fun openBatterySettings(context: Context) {
+            startFirstThatWorks(
+                context,
+                Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
+            )
+        }
+
         /** App info page: where "Allow restricted settings" lives for sideloaded apps on Android 13+. */
         fun openAppInfo(context: Context) {
             startFirstThatWorks(

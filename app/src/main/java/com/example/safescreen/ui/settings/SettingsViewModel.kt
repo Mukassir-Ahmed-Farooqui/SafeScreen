@@ -40,6 +40,20 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
         container.notifier.sendTest()
     }
 
+    /** Starts every app's "used today" count from zero again, right now. Limits and rules stay. */
+    fun resetTodayUsage() {
+        viewModelScope.launch { container.settingsRepository.resetUsageBaseline() }
+    }
+
+    /** After the PIN is confirmed, replaces the recovery code and shows the new one once. */
+    suspend fun newRecoveryCode(pin: String): PinResult {
+        val result = container.pinManager.verify(pin)
+        if (result is PinResult.Success) {
+            container.sessionManager.showRecoveryCode(container.pinManager.createRecoveryCode())
+        }
+        return result
+    }
+
     fun lockNow() = container.sessionManager.lock()
 
     suspend fun changePin(current: String, new: String): PinResult =

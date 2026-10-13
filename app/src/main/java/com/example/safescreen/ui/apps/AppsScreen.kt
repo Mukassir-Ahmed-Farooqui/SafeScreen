@@ -40,6 +40,7 @@ import com.example.safescreen.data.MAX_DAILY_LIMIT_MINUTES
 import com.example.safescreen.ui.components.AppIcon
 import com.example.safescreen.ui.components.EmptyState
 import com.example.safescreen.ui.components.SoftCard
+import com.example.safescreen.ui.components.formatDuration
 import com.example.safescreen.ui.components.formatLimit
 import com.example.safescreen.ui.containerFactory
 
@@ -129,8 +130,11 @@ private fun AppRuleCard(
     onEditLimit: () -> Unit,
     onPreview: () -> Unit,
 ) {
+    val used = item.usedMillis
     val subtitle = when {
-        item.isBlocked -> "Blocked"
+        item.isBlocked -> "Blocked all day"
+        item.limitMinutes > 0 && used != null ->
+            "Limit ${formatLimit(item.limitMinutes)} a day, used ${formatDuration(used)} today"
         item.limitMinutes > 0 -> "Limit ${formatLimit(item.limitMinutes)} a day"
         else -> "No rules"
     }
@@ -141,7 +145,14 @@ private fun AppRuleCard(
                 Text(item.app.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Switch(checked = item.isBlocked, onCheckedChange = onBlockedChange)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Switch(checked = item.isBlocked, onCheckedChange = onBlockedChange)
+                Text(
+                    "Block all day",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         Row(
             modifier = Modifier.padding(top = 10.dp),

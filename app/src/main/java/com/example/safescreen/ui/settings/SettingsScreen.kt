@@ -67,6 +67,8 @@ fun SettingsScreen(
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showChangePin by remember { mutableStateOf(false) }
+    var showNewCode by remember { mutableStateOf(false) }
+    var showResetUsage by remember { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshPermissions() }
 
     Column(
@@ -121,7 +123,7 @@ fun SettingsScreen(
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("Activity alerts", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                         Text(
-                            "Tell me when an app is blocked or has 5 minutes left. A warning when blocking is switched off is always sent.",
+                            "Tell me when an app is blocked or has 10, 5 or 1 minutes left. A warning when blocking is switched off is always sent.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -138,7 +140,40 @@ fun SettingsScreen(
         SoftCard {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilledTonalButton(onClick = { showChangePin = true }, modifier = Modifier.fillMaxWidth()) { Text("Change PIN") }
+                OutlinedButton(onClick = { showNewCode = true }, modifier = Modifier.fillMaxWidth()) { Text("Make a new recovery code") }
                 OutlinedButton(onClick = viewModel::lockNow, modifier = Modifier.fillMaxWidth()) { Text("Lock SafeScreen now") }
+            }
+        }
+
+        SectionTitle("Usage")
+        SoftCard {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Daily limits count all of today's use since midnight. Reset today's usage to start every app's " +
+                        "count from zero again right now, for example to give a fresh start or to test a limit. " +
+                        "Limits and rules stay.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(onClick = { showResetUsage = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Reset today's usage")
+                }
+            }
+        }
+
+        SectionTitle("Keep SafeScreen running")
+        SoftCard {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Some phones stop apps in the background to save battery. If blocking stops working after a " +
+                        "while, set SafeScreen to Unrestricted or Don't optimise.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
+                    onClick = { PermissionChecker.openBatterySettings(context) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Open battery settings") }
             }
         }
 
@@ -160,6 +195,74 @@ fun SettingsScreen(
             onSubmit = { current, new -> viewModel.changePin(current, new) },
         )
     }
+
+    if (showNewCode) {
+        ConfirmPinDialog(
+            title = "New recovery code",
+            message = "Enter your PIN. The old recovery code stops working.",
+            onDismiss = { showNewCode = false },
+            onSubmit = { pin -> viewModel.newRecoveryCode(pin) },
+        )
+    }
+
+    if (showResetUsage) {
+        AlertDialog(
+            onDismissRequest = { showResetUsage = false },
+            title = { Text("Reset today's usage?") },
+            text = { Text("Every app's time used today goes back to 0. Limits and rules stay the same.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.resetTodayUsage()
+                    showResetUsage = false
+                }) { Text("Reset") }
+            },
+            dismissButton = { TextButton(onClick = { showResetUsage = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+@Composable
+private fun ConfirmPinDialog(
+    title: String,
+    message: String,
+    onDismiss: () -> Unit,
+    onSubmit: suspend (pin: String) -> PinResult,
+) {
+    var pin by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                PinField("PIN", pin) { pin = it }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !busy && pin.length == PinHasher.PIN_LENGTH,
+                onClick = {
+                    busy = true
+                    error = null
+                    scope.launch {
+                        when (val result = onSubmit(pin)) {
+                            PinResult.Success -> onDismiss()
+                            is PinResult.Wrong -> error = "That PIN is wrong. ${result.attemptsLeft} attempts left."
+                            is PinResult.LockedOut -> error = "Too many attempts. Try again in ${ceil(result.remainingMs / 1000.0).toInt()}s."
+                            PinResult.NotSet -> error = "No PIN is set yet."
+                        }
+                        busy = false
+                    }
+                },
+            ) { Text("Confirm") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancel") } },
+    )
 }
 
 @Composable
